@@ -4,18 +4,58 @@ services:
     image: postgres:16
     container_name: bike-sharing-db
     environment:
-      POSTGRES_USER: bike_user
-      POSTGRES_PASSWORD: bike_password
-      POSTGRES_DB: bike_sharing
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
       - bike_sharing_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bike_user -d bike_sharing"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - bike-sharing-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: bike-sharing-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "8085:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      pgdatabase:
+        condition: service_healthy
+    networks:
+      - bike-sharing-network
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bike-sharing-ingestion
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: pgdatabase
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+    depends_on:
+      pgdatabase:
+        condition: service_healthy
+    networks:
+      - bike-sharing-network
 
 volumes:
   bike_sharing_data:
+  pgadmin_data:
+
+networks:
+  bike-sharing-network:
+    driver: bridge
